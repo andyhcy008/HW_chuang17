@@ -1,0 +1,83 @@
+---
+title: "HK2"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+
+```{r}
+fileURL <- "https://ed-public-download.apps.cloud.gov/downloads/Most-Recent-Cohorts-Scorecard-Elements.csv"
+> download.file(fileURL,destfile = "CollegeData.csv",method = "auto")
+
+list.files(".")
+```
+
+Now import the file
+```{r}
+CS <- read.csv("CollegeData.csv",na.strings = c("NULL","PrivacySuppressed"))
+library(tibble)
+```
+
+Replace the values of 0 and 0.0000 to NA
+```{r}
+CS [CS == 0] <- NA
+CS[CS==0.0000] <- NA
+```
+
+
+Delect the columns with over 70% percentage of value missing
+```{r}
+CS1 <- CS[,-which(colMeans(is.na(CS))>0.3)]
+```
+
+Fitting the Model
+Since there are only 25 variables left, I decided to choose some variables that might associate with the Student Debts
+Find the correlation between variables
+```{r}
+CS2 <- CS1[sapply(CS1,is.numeric)]
+cor(CS2,use="pairwise.complete.obs")
+```
+
+
+So we can tell the variables accociate with GRAD_DEBT_MDN_SUPP are PREDDEG,RELAFFIL,PCTFLOAN,MD_EARN_WNE_P10,GT_25K_P6 and RPY_3YR_RT_SUPP
+
+First attempt as follow
+```{r}
+fit <- lm(GRAD_DEBT_MDN_SUPP~PREDDEG+RELAFFIL+PCTFLOAN+MD_EARN_WNE_P10+GT_25K_P6+RPY_3YR_RT_SUPP,data=CS2)
+summary(fit)
+```
+
+Continue to the Plot model
+```{r}
+plot(fit)
+```
+
+
+Regression check
+```{r}
+confint(fit)
+```
+
+Variable Selection #1
+```{r}
+library(MASS)
+step <- stepAIC(fit, direction="both")
+step$anova
+```
+
+
+Variable Selection #2
+```{r}
+library(leaps)
+leaps <- regsubsets(GRAD_DEBT_MDN_SUPP~ PREDDEG + RELAFFIL + PCTFLOAN + MD_EARN_WNE_P10 + 
+    GT_25K_P6 + RPY_3YR_RT_SUPP,data=CS2,nbest=10)
+summary(leaps)
+
+plot(leaps,scale="r2")
+
+library(car)
+subsets(leaps,statistic="rsq")
+```
