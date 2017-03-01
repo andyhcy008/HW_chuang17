@@ -1,0 +1,83 @@
+---
+title: "Assignment 3"
+output: html_notebook
+---
+
+
+Import the College Dataset.
+
+```{r}
+fileURL <- "https://ed-public-download.apps.cloud.gov/downloads/Most-Recent-Cohorts-Scorecard-Elements.csv"
+download.file(fileURL,destfile = "CollegeData.csv",method = "auto")
+list.files(".")
+CS <- read.csv("CollegeData.csv",na.strings = c("NULL","PrivacySuppressed"))
+head(CS)
+```
+
+Before we demonstrate decision trees, we have to install the 
+requisite packages.
+
+```{r}
+pkgs <- c("rpart", "rpart.plot", "party")
+install.packages(pkgs)
+```
+
+Replace the values of 0 and 0.0000 to NA
+
+```{r}
+CS [CS == 0] <- NA
+CS[CS==0.0000] <- NA
+```
+
+Delect the columns with over 70% percentage of value missing
+
+```{r}
+CS1 <- CS[,-which(colMeans(is.na(CS))>0.3)]
+```
+
+
+The object is to predict the median debt, which is attribute 'GRAD_DEBT_MDN_SUPP'.
+We have to set trainning set before doing analysis.
+
+```{r}
+set.seed(1234)
+train <- sample(nrow(CS1), 0.7*nrow(CS1))
+CS1.train <- CS1[train,]
+CS1.validate <- CS1[-train,]
+dim(CS1.train)
+dim(CS1.validate)
+```
+
+
+Fit the tree
+```{r}
+library(rpart)
+Dtree <- rpart(GRAD_DEBT_MDN_SUPP~.,data=CS1.train,method="anova",parms=list(split="information"))
+Dtree$cptable
+```
+
+Select the smallest cross-validation error
+```{r}
+plotcp(Dtree)
+PV <- Dtree$catable[which.min(Dtree$captable[,"xerror"]),"CP"]
+Dtree.p <- prune(Dtree,cp=PV)
+Dtree.p
+plotcp(Dtree.p)
+Dtree.p$captable
+```
+
+Plot the tree
+
+```{r}
+library(rpart.plot)
+prp(Dtree.p,type=2,extra=100,fallen.leaves = T,main="Decision Tree")
+```
+
+Decision tree on validation set
+
+```{r}
+Dtree.pred <- predict(Dtree.p,CS1.validate)
+summary(Dtree.pred)
+Dtree.pred
+```
+
